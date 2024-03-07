@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
 import axios from "axios";
+import { paginate } from "./utils/paginate";
+import Pagination from "./pagination";
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     getItems();
@@ -36,7 +39,7 @@ function App() {
       );
       const ids = idsData.data.result;
 
-      const itemsData = await axios.post(
+      const { data } = await axios.post(
         "http://api.valantis.store:40000/",
         {
           action: "get_items",
@@ -49,23 +52,62 @@ function App() {
           },
         }
       );
-      setItems(itemsData);
+      const items = data.result;
+      setItems(items);
       setIsLoading(false);
-      console.log(itemsData);
+      console.log(items);
     } catch (error) {
       console.error(error);
     }
   }
 
+  const pageSize = 50;
+
+  const handlePageChange = (pageIndex) => {
+    setCurrentPage(pageIndex);
+  };
+
+  // const filteredUsers = searchQuery
+  //     ? users.filter(
+  //           (user) =>
+  //               user.name
+  //                   .toLowerCase()
+  //                   .indexOf(searchQuery.toLowerCase()) !== -1
+  //       )
+  //     : selectedProf
+  //     ? users.filter(
+  //           (user) =>
+  //               JSON.stringify(user.profession) ===
+  //               JSON.stringify(selectedProf)
+  //       )
+  //     : users;
+
+  const count = items.length;
+  // const sortedUsers = _.orderBy(
+  //     filteredUsers,
+  //     [sortBy.path],
+  //     [sortBy.order]
+  // );
+  const itemsCrop = paginate(items, currentPage, pageSize);
+  // const clearFilter = () => {
+  //     setSelectedProf();
+  // }
+
   return !isLoading ? (
     <>
       <div>
         <ul>
-          {items.data.result.map((item, i) => (
+          {itemsCrop.map((item, i) => (
             <li key={i}>{item.product}</li>
           ))}
         </ul>
       </div>
+      <Pagination
+        itemsCount={count}
+        pageSize={pageSize}
+        currentPage={currentPage}
+        onPageChange={handlePageChange}
+      />
     </>
   ) : (
     <div>Loading...</div>
