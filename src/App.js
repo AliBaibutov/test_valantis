@@ -1,114 +1,124 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import CryptoJS from "crypto-js";
 import axios from "axios";
 import { paginate } from "./utils/paginate";
 import Pagination from "./pagination";
+import _ from "lodash";
+
+const ITEMS_PER_PAGE = 50;
+
+const date = new Date();
+const year = String(date.getFullYear());
+const month =
+  date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1;
+const day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+const fullDate = year + month + day;
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
+  const [countErrors, setCountErrors] = useState(0);
 
-  useEffect(() => {
-    getItems();
+  useEffect(function initialDataFetch() {
+    if (!isInitialDataLoaded) {
+      getItems();
+      setIsInitialDataLoaded(true);
+    }
   }, []);
 
-  const date = new Date();
-  const year = String(date.getFullYear());
-  const month =
-    date.getMonth() + 1 < 10
-      ? "0" + (date.getMonth() + 1)
-      : date.getMonth() + 1;
-  const day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
-  const fullDate = year + month + day;
+  useEffect(
+    function fetchItems() {
+      if (isInitialDataLoaded) {
+        getItems();
+      }
+    },
+    [currentPage]
+  );
 
-  async function getItems() {
-    try {
-      const idsData = await axios.post(
-        "http://api.valantis.store:40000/",
-        {
-          action: "get_ids",
-          // params: { ids: ["1789ecf3-f81c-4f49-ada2-83804dcc74b0"] },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
+  const getItems = useCallback(
+    async function () {
+      try {
+        const idsData = await axios.post(
+          "http://api.valantis.store:40000/",
+          {
+            action: "get_ids",
+            params: {
+              offset:
+                currentPage === 1 ? 0 : (currentPage - 1) * ITEMS_PER_PAGE,
+              limit: ITEMS_PER_PAGE,
+            },
           },
-        }
-      );
-      const ids = idsData.data.result;
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
+            },
+          }
+        );
+        const ids = idsData.data.result;
 
-      const { data } = await axios.post(
-        "http://api.valantis.store:40000/",
-        {
-          action: "get_items",
-          params: { ids: ids },
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
+        const { data } = await axios.post(
+          "http://api.valantis.store:40000/",
+          {
+            action: "get_items",
+            params: { ids: ids },
           },
+          {
+            headers: {
+              "Content-Type": "application/json",
+              "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
+            },
+          }
+        );
+        const items = data.result;
+        const filteredItems = _.uniqBy(items, "id");
+        setItems(filteredItems);
+        console.log(filteredItems);
+      } catch (error) {
+        if (countErrors === 0) {
+          setCountErrors(countErrors + 1);
+          getItems();
         }
-      );
-      const items = data.result;
-      setItems(items);
-      setIsLoading(false);
-      console.log(items);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-
-  const pageSize = 50;
+        console.error(error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currentPage, countErrors]
+  );
 
   const handlePageChange = (pageIndex) => {
     setCurrentPage(pageIndex);
   };
 
-  // const filteredUsers = searchQuery
-  //     ? users.filter(
-  //           (user) =>
-  //               user.name
-  //                   .toLowerCase()
-  //                   .indexOf(searchQuery.toLowerCase()) !== -1
-  //       )
-  //     : selectedProf
-  //     ? users.filter(
-  //           (user) =>
-  //               JSON.stringify(user.profession) ===
-  //               JSON.stringify(selectedProf)
-  //       )
-  //     : users;
-
   const count = items.length;
-  // const sortedUsers = _.orderBy(
-  //     filteredUsers,
-  //     [sortBy.path],
-  //     [sortBy.order]
-  // );
-  const itemsCrop = paginate(items, currentPage, pageSize);
-  // const clearFilter = () => {
-  //     setSelectedProf();
-  // }
+  // const itemsCrop = paginate(items, currentPage, ITEMS_PER_PAGE);
 
   return !isLoading ? (
-    <>
-      <div>
-        <ul>
-          {itemsCrop.map((item, i) => (
-            <li key={i}>{item.product}</li>
-          ))}
-        </ul>
+    <div className="container">
+      <div className="content">
+        <div className="content__title">ID</div>
+        <div className="content__title">Наименование</div>
+        <div className="content__title">Цена</div>
+        <div className="content__title">Бренд</div>
       </div>
+      {items.map((item, i) => (
+        <div key={i} className="content">
+          <div className="content__item">{item.id}</div>
+          <div className="content__item">{item.product}</div>
+          <div className="content__item">{item.price}</div>
+          <div className="content__item">{item.brand}</div>
+        </div>
+      ))}
       <Pagination
-        itemsCount={count}
-        pageSize={pageSize}
+        itemsCount={ITEMS_PER_PAGE * currentPage}
+        pageSize={ITEMS_PER_PAGE}
         currentPage={currentPage}
         onPageChange={handlePageChange}
       />
-    </>
+    </div>
   ) : (
     <div>Loading...</div>
   );

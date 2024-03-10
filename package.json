@@ -10,6 +10,7 @@
     "bootstrap": "^5.3.3",
     "crypto-js": "^4.2.0",
     "cryptojs": "^2.5.3",
+    "lodash": "^4.17.21",
     "md5": "^2.3.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
