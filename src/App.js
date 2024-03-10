@@ -1,11 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import CryptoJS from "crypto-js";
 import axios from "axios";
 import { paginate } from "./utils/paginate";
 import Pagination from "./pagination";
 import _ from "lodash";
-
-const ITEMS_PER_PAGE = 50;
+import Filters from "./filters";
 
 const date = new Date();
 const year = String(date.getFullYear());
@@ -14,12 +13,21 @@ const month =
 const day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
 const fullDate = year + month + day;
 
+export const API_URL = "http://api.valantis.store:40000/";
+export const HEADERS = {
+  "Content-Type": "application/json",
+  "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
+};
+
+const ITEMS_PER_PAGE = 50;
+
 function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   const [countErrors, setCountErrors] = useState(0);
+  const [filteredIds, setFilteredIds] = useState(null);
 
   useEffect(function initialDataFetch() {
     if (!isInitialDataLoaded) {
@@ -41,7 +49,7 @@ function App() {
     async function () {
       try {
         const idsData = await axios.post(
-          "http://api.valantis.store:40000/",
+          API_URL,
           {
             action: "get_ids",
             params: {
@@ -51,25 +59,19 @@ function App() {
             },
           },
           {
-            headers: {
-              "Content-Type": "application/json",
-              "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
-            },
+            headers: HEADERS,
           }
         );
         const ids = idsData.data.result;
 
         const { data } = await axios.post(
-          "http://api.valantis.store:40000/",
+          API_URL,
           {
             action: "get_items",
             params: { ids: ids },
           },
           {
-            headers: {
-              "Content-Type": "application/json",
-              "X-Auth": CryptoJS.MD5(`Valantis_${fullDate}`),
-            },
+            headers: HEADERS,
           }
         );
         const items = data.result;
@@ -93,18 +95,29 @@ function App() {
     setCurrentPage(pageIndex);
   };
 
-  const count = items.length;
-  // const itemsCrop = paginate(items, currentPage, ITEMS_PER_PAGE);
+  const preparedItems = useMemo(() => {
+    if (filteredIds === null) {
+      return items;
+    }
+
+    if (_.isEmpty(filteredIds)) {
+      return [];
+    }
+    return items.filter((item) => {
+      return filteredIds.includes(item.id);
+    });
+  }, [items, filteredIds]);
 
   return !isLoading ? (
     <div className="container">
+      <Filters setFilteredIds={setFilteredIds} />
       <div className="content">
         <div className="content__title">ID</div>
         <div className="content__title">Наименование</div>
         <div className="content__title">Цена</div>
         <div className="content__title">Бренд</div>
       </div>
-      {items.map((item, i) => (
+      {preparedItems.map((item, i) => (
         <div key={i} className="content">
           <div className="content__item">{item.id}</div>
           <div className="content__item">{item.product}</div>
